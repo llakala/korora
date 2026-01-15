@@ -135,7 +135,21 @@ fix (self: {
     # Verification function returning a bool.
     verify:
     assert isFunction verify;
-    self.typedef' name (wrapBoolVerify name verify);
+    self.typedef' name (wrapBoolVerify name verify) { };
+
+  /**
+    Declare a custom type using a bool function, along with some extra metadata
+  */
+  typedefWith =
+    # Name of the type as a string
+    name:
+    # Verification function returning a bool.
+    verify:
+    # Extra attributes to be included in the final type. Often used to set a
+    # description, like `{ description = "list of int"; }`
+    extra:
+    assert isFunction verify;
+    self.typedef' name (wrapBoolVerify name verify) extra;
 
   /*
     Declare a custom type using an option<str> function.
@@ -145,8 +159,12 @@ fix (self: {
     name:
     # Verification function returning null on success & a string with error message on error.
     verify:
+    # Extra attributes to be included in the final type. Often used to set a
+    # description, like `{ description = "list of int"; }`
+    extra:
     assert isFunction verify;
-    {
+    extra
+    // {
       inherit name verify;
       check = v: v2: if verify v == null then v2 else throw (verify v);
 
@@ -169,7 +187,7 @@ fix (self: {
   /*
     Any
   */
-  any = self.typedef' "any" (_: null);
+  any = self.typedef' "any" (_: null) { };
 
   /*
     Never
@@ -252,7 +270,9 @@ fix (self: {
       inherit (t) verify;
       withErrorContext = addErrorContext "in ${name}";
     in
-    self.typedef' name (v: if v == null then null else withErrorContext (verify v));
+    self.typedef' name (v: if v == null then null else withErrorContext (verify v)) {
+      description = "either null or ${t.description or t.name}";
+    };
 
   /*
     listOf<t>
@@ -265,7 +285,9 @@ fix (self: {
       inherit (t) verify;
       withErrorContext = addErrorContext "in ${name} element";
     in
-    self.typedef' name (v: if !isList v then typeError name v else withErrorContext (all' verify v));
+    self.typedef' name (v: if !isList v then typeError name v else withErrorContext (all' verify v)) {
+      description = "list of ${t.description or t.name}s";
+    };
 
   /*
     listOf<t>
@@ -278,9 +300,11 @@ fix (self: {
       inherit (t) verify;
       withErrorContext = addErrorContext "in ${name} value";
     in
-    self.typedef' name (
-      v: if !isAttrs v then typeError name v else withErrorContext (all' verify (attrValues v))
-    );
+    self.typedef' name
+      (v: if !isAttrs v then typeError name v else withErrorContext (all' verify (attrValues v)))
+      {
+        description = "attrset of ${t.description or t.name}s";
+      };
 
   /*
     union<types...>
@@ -292,8 +316,19 @@ fix (self: {
     let
       name = "union<${concatStringsSep "," (map (t: t.name) types)}>";
       funcs = map (t: t.verify) types;
+      descs = map (t: t.description or t.name) types;
+      len = length types;
+      lastIndex = len - 1;
     in
-    self.typedef name (v: any (func: func v == null) funcs);
+    self.typedefWith name (v: any (func: func v == null) funcs) {
+      description =
+        if len <= 2 then
+          concatStringsSep " or " descs
+        else
+          concatStringsSep ", " (
+            genList (i: if i != lastIndex then elemAt descs i else "or " + elemAt descs i) len
+          );
+    };
 
   /*
     intersection<types...>
@@ -324,7 +359,7 @@ fix (self: {
     );
     ```
   */
-  rename = name: type: self.typedef' name type.verify;
+  rename = name: type: self.typedef' name type.verify type;
 
   /*
     struct<name, members...>
@@ -482,7 +517,8 @@ fix (self: {
               ) null allFuncs;
 
         in
-        (self.typedef' name (v: withErrorContext (if !isAttrs v then typeError name v else verify' v)))
+        # TODO: add description
+        (self.typedef' name (v: withErrorContext (if !isAttrs v then typeError name v else verify' v)) { })
         // {
           override = mkStruct';
         };
@@ -499,7 +535,7 @@ fix (self: {
       inherit (t) verify;
       withErrorContext = addErrorContext "in ${name}";
     in
-    self.typedef' name (v: withErrorContext (verify v));
+    self.typedef' name (v: withErrorContext (verify v)) { description = "optional ${t.name}"; };
 
   /*
     enum<name, elems...>
@@ -510,9 +546,10 @@ fix (self: {
     # List of allowable enum members
     elems:
     assert isList elems;
+    # TODO: add description
     self.typedef' name (
       v: if elem v elems then null else "'${toPretty v}' is not a member of enum '${name}'"
-    );
+    ) { };
 
   /*
     tuple<elems...>
@@ -522,7 +559,8 @@ fix (self: {
     members:
     assert isList members;
     let
-      name = "tuple<${concatStringsSep ", " (map (t: t.name) members)}>";
+      memberNames = map (t: t.name) members;
+      name = "tuple<${concatStringsSep "," memberNames}>";
       withErrorContext = addErrorContext "in ${name}";
       len = length members;
       funcs = map (t: t.verify) members;
@@ -532,12 +570,19 @@ fix (self: {
         else if (elemAt funcs i) (elemAt v i) != null then ("in element ${toString i}: ${(elemAt funcs i) (elemAt v i)}")
         else verifyValue v (i + 1);
     in
-    self.typedef' name (
-      v:
-      if ! isList v then typeError name v
-      else if (length v) != len then "Expected tuple to have length ${toString len} but value '${toPretty v}' has length ${toString (length v)}"
-      else withErrorContext (verifyValue v 0)
-    );
+    self.typedef' name
+      (
+        v:
+        if !isList v then
+          typeError name v
+        else if (length v) != len then
+          "Expected tuple to have length ${toString len} but value '${toPretty v}' has length ${toString (length v)}"
+        else
+          withErrorContext (verifyValue v 0)
+      )
+      {
+        description = "tuple of ${concatStringsSep ", " memberNames}";
+      };
 
   /*
     Create a wrapped type checked function.

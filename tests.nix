@@ -6,7 +6,7 @@
 let
   inherit (lib) toUpper substring stringLength;
 
-  types = import ./default.nix { inherit lib; };
+  types = import ./types.nix;
 
   capitalise = s: toUpper (substring 0 1 s) + (substring 1 (stringLength s) s);
 
@@ -70,6 +70,16 @@ lib.fix (
       testInvalidFunc = {
         expr = types.typedef' "testDef" "x";
         expectedError.type = "AssertionError";
+      };
+    };
+    typedefWith = {
+      testValid = {
+        expr = (types.typedefWith "testDef" (_: true) { description = "test description"; }).description;
+        expected = "test description";
+      };
+      testInclusionOrder = {
+        expr = (types.typedefWith "testDef" (_: true) { verify = 5; }).verify != 5;
+        expected = true;
       };
     };
 
@@ -265,6 +275,20 @@ lib.fix (
         testInvalid = {
           expr = testUnion.verify 1;
           expected = "Expected type 'union<string>' but value '1' is of type 'int'";
+        };
+
+        testDescription = {
+          expr =
+            let
+              largeUnion = types.union [
+                types.str
+                types.int
+                types.float
+                types.bool
+              ];
+            in
+            largeUnion.description;
+          expected = "string, int, float, or bool";
         };
       };
 
@@ -476,6 +500,15 @@ lib.fix (
           isFunction = true;
         };
       };
+      testAttrsPreserved = {
+        expr =
+          let
+            original = types.typedefWith "demo" (_: true) { description = "description contents"; };
+            renamed = types.rename "renamedDemo" original;
+          in
+          renamed.description;
+        expected = "description contents";
+      };
     };
 
     tuple =
@@ -488,7 +521,7 @@ lib.fix (
       {
         testNotList = {
           expr = testTuple.verify "xyz";
-          expected = "Expected type 'tuple<string, int>' but value '\"xyz\"' is of type 'string'";
+          expected = "Expected type 'tuple<string,int>' but value '\"xyz\"' is of type 'string'";
         };
 
         testInvalidLength = {
@@ -498,12 +531,12 @@ lib.fix (
 
         testInvalidType = {
           expr = testTuple.verify [ 123 "xyz" ];
-          expected = "in tuple<string, int>: in element 0: Expected type 'string' but value '123' is of type 'int'";
+          expected = "in tuple<string,int>: in element 0: Expected type 'string' but value '123' is of type 'int'";
         };
 
         testInvalidTypeTail = {
           expr = testTuple.verify [ "xyz" "123" ];
-          expected = "in tuple<string, int>: in element 1: Expected type 'int' but value '\"123\"' is of type 'string'";
+          expected = "in tuple<string,int>: in element 1: Expected type 'int' but value '\"123\"' is of type 'string'";
         };
 
         testValid = {
