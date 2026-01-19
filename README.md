@@ -224,8 +224,11 @@ struct<name, members...>
 
 #### Example
 ``` nix
-korora.struct "myStruct" {
-  foo = types.string;
+korora.struct {
+  name = "myStruct";
+  types = {
+    foo = types.string;
+  };
 }
 ```
 
@@ -235,9 +238,12 @@ korora.struct "myStruct" {
 
 By default, all attribute names must be present in a struct. It is possible to override this by specifying _totality_. Here is how to do this:
 ``` nix
-(korora.struct "myStruct" {
-  foo = types.string;
-}).override { total = false; }
+korora.struct {
+  name = "myStruct";
+  types = {
+    foo = types.string;
+  };
+}
 ```
 
 This means that a `myStruct` struct can have any of the keys omitted. Thus these are valid:
@@ -252,11 +258,15 @@ in ...
 
 By default, unknown attribute names are allowed.
 
-It is possible to override this by specifying `unknown`.
-``` nix
-(korora.struct "myStruct" {
-  foo = types.string;
-}).override { unknown = false; }
+It is possible to override this by specifying `unknown` on struct creation:
+```nix
+korora.struct {
+  name = "myStruct";
+  unknown = false;
+  types = {
+    foo = types.string;
+  };
+}
 ```
 
 This means that
@@ -275,24 +285,57 @@ allocation this function allocates one intermediate attribute set per struct ver
 
 Custom struct verification functions can be added as such:
 ``` nix
-(types.struct "testStruct2" {
-  x = types.int;
-  y = types.int;
-}).override {
+korora.struct {
+  name = "testStruct2";
   verify = v: if v.x + v.y == 2 then "VERBOTEN" else null;
-};
+  types = {
+    x = types.int;
+    y = types.int;
+  };
+}
 ```
+
+- Overridability
+
+An existing struct can have its behavior changed, by using `.override` like so:
+```nix
+let
+  # total is true by default
+  myStruct = korora.struct {
+    name = "myStruct";
+    types = {
+      foo = types.string;
+    };
+  };
+in
+  myStruct.override { total = false; }
+```
+
+This allows overriding `total`, `unknown`, and `verify` after the fact.
 
 #### Function signature
 
-`name`
+structured function argument
 
-: Name of struct type as a string
+: `name`
 
+  : Function argument
 
-`members`
+  `types`
 
-: Attribute set of type definitions.
+  : Name of struct type as a strng
+
+  `total`
+
+  : Attribute set of type definitions
+
+  `unknown`
+
+  : Function argument
+
+  `verify`
+
+  : Function argument
 
 
 ## `lib.types.optionalAttr`

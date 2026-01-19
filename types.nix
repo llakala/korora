@@ -331,8 +331,11 @@ fix (self: {
 
     #### Example
     ``` nix
-    korora.struct "myStruct" {
-      foo = types.string;
+    korora.struct {
+      name = "myStruct";
+      types = {
+        foo = types.string;
+      };
     }
     ```
 
@@ -342,9 +345,12 @@ fix (self: {
 
     By default, all attribute names must be present in a struct. It is possible to override this by specifying _totality_. Here is how to do this:
     ``` nix
-    (korora.struct "myStruct" {
-      foo = types.string;
-    }).override { total = false; }
+    korora.struct {
+      name = "myStruct";
+      types = {
+        foo = types.string;
+      };
+    }
     ```
 
     This means that a `myStruct` struct can have any of the keys omitted. Thus these are valid:
@@ -359,11 +365,15 @@ fix (self: {
 
     By default, unknown attribute names are allowed.
 
-    It is possible to override this by specifying `unknown`.
-    ``` nix
-    (korora.struct "myStruct" {
-      foo = types.string;
-    }).override { unknown = false; }
+    It is possible to override this by specifying `unknown` on struct creation:
+    ```nix
+    korora.struct {
+      name = "myStruct";
+      unknown = false;
+      types = {
+        foo = types.string;
+      };
+    }
     ```
 
     This means that
@@ -382,26 +392,49 @@ fix (self: {
 
     Custom struct verification functions can be added as such:
     ``` nix
-    (types.struct "testStruct2" {
-      x = types.int;
-      y = types.int;
-    }).override {
+    korora.struct {
+      name = "testStruct2";
       verify = v: if v.x + v.y == 2 then "VERBOTEN" else null;
-    };
+      types = {
+        x = types.int;
+        y = types.int;
+      };
+    }
     ```
+
+    - Overridability
+
+    An existing struct can have its behavior changed, by using `.override` like so:
+    ```nix
+    let
+      # total is true by default
+      myStruct = korora.struct {
+        name = "myStruct";
+        types = {
+          foo = types.string;
+        };
+      };
+    in
+      myStruct.override { total = false; }
+    ```
+
+    This allows overriding `total`, `unknown`, and `verify` after the fact.
 
     #### Function signature
   */
   struct =
-    # Name of struct type as a string
-    name:
-    # Attribute set of type definitions.
-    members:
-    assert isAttrs members;
+    {
+      name, # Name of struct type as a strng
+      types, # Attribute set of type definitions
+      total ? true,
+      unknown ? true,
+      verify ? null,
+    }:
+    assert isAttrs types;
+    assert verify != null -> isFunction verify;
     let
-      names = attrNames members;
+      names = attrNames types;
       withErrorContext = addErrorContext "in struct '${name}'";
-
       mkStruct' =
         {
           total ? true,
@@ -429,7 +462,7 @@ fix (self: {
               funcs = map (
                 attr:
                 let
-                  memberType = members.${attr};
+                  memberType = types.${attr};
                   inherit (memberType) verify;
                   withErrorContext = addErrorContext "in member '${attr}'";
                   missingMember = "missing member '${attr}'";
@@ -487,7 +520,7 @@ fix (self: {
           override = mkStruct';
         };
     in
-    mkStruct' { };
+    mkStruct' { inherit total unknown verify; };
 
   /*
     optionalAttr<t>

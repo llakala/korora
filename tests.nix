@@ -300,12 +300,20 @@ lib.fix (
 
     intersection =
       let
-        struct1 = types.struct "struct1" {
-          a = types.str;
+        struct1 = types.struct {
+          name = "struct1";
+          unknown = true;
+          types = {
+            a = types.str;
+          };
         };
 
-        struct2 = types.struct "struct2" {
-          b = types.str;
+        struct2 = types.struct {
+          name = "struct2";
+          unknown = true;
+          types = {
+            b = types.str;
+          };
         };
 
         testIntersection = types.intersection [
@@ -363,21 +371,33 @@ lib.fix (
 
     struct =
       let
-        testStruct = types.struct "testStruct" {
-          foo = types.string;
+        testStruct = types.struct {
+          name = "testStruct";
+          types = {
+            foo = types.string;
+          };
         };
 
-        testStruct2 =
-          (types.struct "testStruct2" {
+        testStruct2 = types.struct {
+          name = "testStruct2";
+          types = {
             x = types.int;
             y = types.int;
-          }).override
-            {
-              verify = v: if v.x + v.y == 2 then "VERBOTEN" else null;
-            };
+          };
+          verify = v: if v.x + v.y == 2 then "VERBOTEN" else "OTHER";
+        };
 
         testStructNonTotal = testStruct.override { total = false; };
         testStructWithoutUnknown = testStruct.override { unknown = false; };
+        testStructNewVerify = testStruct2.override {
+          verify = v: if v.x + v.y == 3 then "VERBOTEN" else null;
+        };
+
+        doubleOverride =
+          (testStruct2.override {
+            verify = v: "FIRST";
+          }).override
+            { verify = v: "SECOND"; };
 
       in
       {
@@ -407,6 +427,22 @@ lib.fix (
             y = 1;
           };
           expected = "in struct 'testStruct2': VERBOTEN";
+        };
+
+        testVerifyOverride = {
+          expr = testStructNewVerify.verify {
+            x = 2;
+            y = 1;
+          };
+          expected = "in struct 'testStruct2': VERBOTEN";
+        };
+
+        testDoubleOverride = {
+          expr = doubleOverride.verify {
+            x = 1;
+            y = 2;
+          };
+          expected = "in struct 'testStruct2': SECOND";
         };
 
         testUnknownAttrNotAllowed = {
@@ -440,9 +476,12 @@ lib.fix (
 
     optionalAttr =
       let
-        testStruct = types.struct "testOptionalAttrStruct" {
-          foo = types.string;
-          optionalFoo = types.optionalAttr types.string;
+        testStruct = types.struct {
+          name = "testOptionalAttrStruct";
+          types = {
+            foo = types.string;
+            optionalFoo = types.optionalAttr types.string;
+          };
         };
 
       in
@@ -579,8 +618,11 @@ lib.fix (
     recursiveTypes = {
       struct =
         let
-          recursive = types.struct "recursive" {
-            children = types.optionalAttr (types.attrsOf recursive);
+          recursive = types.struct {
+            name = "recursive";
+            types = {
+              children = types.optionalAttr (types.attrsOf recursive);
+            };
           };
         in
         {
