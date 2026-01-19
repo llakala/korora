@@ -256,13 +256,13 @@ in ...
 
 - Unknown attribute names
 
-By default, unknown attribute names are allowed.
+By default, unknown attribute names are not allowed.
 
 It is possible to override this by specifying `unknown` on struct creation:
 ```nix
 korora.struct {
   name = "myStruct";
-  unknown = false;
+  unknown = true;
   types = {
     foo = types.string;
   };
@@ -276,7 +276,7 @@ This means that
   baz = "hello";
 }
 ```
-is normally valid, but not when `unknown` is set to `false`.
+is normally invalid, but works when `unknown` is set to `true`.
 
 Because Nix lacks primitive operations to iterate over attribute sets dynamically without
 allocation this function allocates one intermediate attribute set per struct verification.
@@ -315,27 +315,9 @@ This allows overriding `total`, `unknown`, and `verify` after the fact.
 
 #### Function signature
 
-structured function argument
+`args`
 
-: `name`
-
-  : Function argument
-
-  `types`
-
-  : Name of struct type as a strng
-
-  `total`
-
-  : Attribute set of type definitions
-
-  `unknown`
-
-  : Function argument
-
-  `verify`
-
-  : Function argument
+: Function argument
 
 
 ## `lib.types.optionalAttr`
