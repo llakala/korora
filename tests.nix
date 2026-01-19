@@ -388,7 +388,7 @@ lib.fix (
         };
 
         testStructNonTotal = testStruct.override { total = false; };
-        testStructWithoutUnknown = testStruct.override { unknown = false; };
+        testStructWithUnknown = testStruct.override { unknown = true; };
         testStructNewVerify = testStruct2.override {
           verify = v: if v.x + v.y == 3 then "VERBOTEN" else null;
         };
@@ -414,10 +414,7 @@ lib.fix (
         };
 
         testNonTotal = {
-          expr = testStructNonTotal.verify {
-            foo = "bar";
-            unknown = "is allowed";
-          };
+          expr = testStructNonTotal.verify {};
           expected = null;
         };
 
@@ -446,15 +443,14 @@ lib.fix (
         };
 
         testUnknownAttrNotAllowed = {
-          expr = testStructWithoutUnknown.verify {
+          expr = testStruct.verify {
             foo = "bar";
             bar = "foo";
           };
           expected = "in struct 'testStruct': keys ['bar'] are unrecognized, expected keys are ['foo']";
         };
-
         testUnknownAttr = {
-          expr = testStruct.verify {
+          expr = testStructWithUnknown.verify {
             foo = "bar";
             bar = "foo";
           };

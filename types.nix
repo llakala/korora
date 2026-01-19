@@ -363,13 +363,13 @@ fix (self: {
 
     - Unknown attribute names
 
-    By default, unknown attribute names are allowed.
+    By default, unknown attribute names are not allowed.
 
     It is possible to override this by specifying `unknown` on struct creation:
     ```nix
     korora.struct {
       name = "myStruct";
-      unknown = false;
+      unknown = true;
       types = {
         foo = types.string;
       };
@@ -383,7 +383,7 @@ fix (self: {
       baz = "hello";
     }
     ```
-    is normally valid, but not when `unknown` is set to `false`.
+    is normally invalid, but works when `unknown` is set to `true`.
 
     Because Nix lacks primitive operations to iterate over attribute sets dynamically without
     allocation this function allocates one intermediate attribute set per struct verification.
@@ -427,7 +427,7 @@ fix (self: {
       name, # Name of struct type as a strng
       types, # Attribute set of type definitions
       total ? true,
-      unknown ? true,
+      unknown ? false,
       verify ? null,
     }:
     assert isAttrs types;
@@ -438,7 +438,7 @@ fix (self: {
       mkStruct' =
         {
           total ? true,
-          unknown ? true,
+          unknown ? false,
           verify ? null,
         }:
         assert isBool total;
